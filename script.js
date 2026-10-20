@@ -1,5 +1,6 @@
-const API_KEY = 'E75C6CJNDKR7FJH7XCYDNRGXH'; // 
+const API_KEY = 'E75C6CJNDKR7FJH7XCYDNRGXH'; // Make sure your exact key is here
 
+// DOM Elements
 const form = document.getElementById('weather-form');
 const locationInput = document.getElementById('location-input');
 const loadingText = document.getElementById('loading');
@@ -9,41 +10,34 @@ const weatherConditionEl = document.getElementById('weather-condition');
 const temperatureEl = document.getElementById('temperature');
 const toggleBtn = document.getElementById('toggle-temp');
 
-let currentTempC = 0;
 let currentTempF = 0;
+let currentTempC = 0;
 let isCelsius = true;
 
 async function fetchWeatherData(location) {
-    try {
-
-        const response = await fetch(`https://api.openweathermap.org/data/2.5/weather?q=${location}&appid=${API_KEY}&units=metric`);
-        
-        if (!response.ok) throw new Error(`Location not found , add realistic location not ${location} !`);
-        
-        const data = await response.json();
-        console.log("Raw API Data:", data); // console.log() the info as requested
-        return data;
-    } catch (error) {
-        console.error(error);
-        alert(error.message);
-        return null;
+    // Using Visual Crossing API
+    const response = await fetch(`https://weather.visualcrossing.com/VisualCrossingWebServices/rest/services/timeline/${location}?key=${API_KEY}`, { mode: 'cors' });
+    
+    if (!response.ok) {
+        throw new Error(`API Error: ${response.status} - Please check city name , DB doesn't contain ${location}.`);
     }
+    
+    return await response.json();
 }
 
 function processWeatherData(rawData) {
-    if (!rawData) return null;
+    const tempF = rawData.currentConditions.temp;
+    const tempC = (tempF - 32) * (5/9); 
     
     return {
-        city: rawData.name,
-        condition: rawData.weather[0].main,
-        tempC: rawData.main.temp,
-        tempF: (rawData.main.temp * 9/5) + 32 // Calculate Fahrenheit
+        city: rawData.resolvedAddress,
+        condition: rawData.currentConditions.conditions,
+        tempF: tempF,
+        tempC: tempC
     };
 }
 
 function updateDOM(data) {
-    if (!data) return;
-
     currentTempC = data.tempC;
     currentTempF = data.tempF;
 
@@ -60,7 +54,6 @@ function renderTemperature() {
         : `${Math.round(currentTempF)}°F`;
 }
 
-// Toggle event listener
 toggleBtn.addEventListener('click', () => {
     isCelsius = !isCelsius;
     renderTemperature();
@@ -71,18 +64,20 @@ form.addEventListener('submit', async (e) => {
     const location = locationInput.value.trim();
     if (!location) return;
 
-    // Show loading, hide previous results
+    // Reset UI
     weatherDisplay.classList.add('hidden');
+    loadingText.textContent = 'Fetching weather data...';
+    loadingText.style.color = '#666'; // 
     loadingText.classList.remove('hidden');
 
-    const rawData = await fetchWeatherData(location);
-    const processedData = processWeatherData(rawData);
-
-    // Hide loading
-    loadingText.classList.add('hidden');
-
-    if (processedData) {
-        console.log("Processed Data:", processedData); // console.log() it
+    try {
+        const rawData = await fetchWeatherData(location);
+        const processedData = processWeatherData(rawData);
         updateDOM(processedData);
+        loadingText.classList.add('hidden'); // Hide loading only on success
+    } catch (error) {
+        console.error("Caught an error:", error);
+        loadingText.textContent = `${error.message}`;
+        loadingText.style.color = 'red';
     }
 });
